@@ -3,12 +3,14 @@ from tvDatafeed import TvDatafeed, Interval
 import pandas as pd
 from datetime import time
 
+
 app = Flask(__name__)
 
 
 
 def getupdates():
   tv = TvDatafeed()
+
   nifty_index_data = tv.get_hist(
       symbol='XAUINRG',
       exchange='FX_IDC',
@@ -55,4 +57,4 @@ def data():
     return jsonify(df.to_dict(orient='records'))
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()
