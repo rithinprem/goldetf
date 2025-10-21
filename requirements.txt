@@ -1,0 +1,4 @@
+pandas>=1.5
+Flask>=2.3
+gunicorn>=21
+git+https://github.com/rongardF/tvdatafeed.git
