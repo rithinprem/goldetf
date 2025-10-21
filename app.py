@@ -8,7 +8,7 @@ app = Flask(__name__)
 
 
 def getupdates():
-  tv = TvDatafeed(username="endbeginner992000", password="resetyourpassword@1234")
+  tv = TvDatafeed()
   nifty_index_data = tv.get_hist(
       symbol='XAUINRG',
       exchange='FX_IDC',
@@ -20,7 +20,7 @@ def getupdates():
   df = nifty_index_data.reset_index()
   df = df.sort_values(by='datetime', ascending=True)
   df = df.drop(['symbol'], axis=1)
-  df['datetime'] = df['datetime'].dt.tz_localize('UTC').dt.tz_convert('Asia/Kolkata').dt.tz_localize(None)
+  df['datetime'] = df['datetime'].dt.tz_localize('UTC').dt.tz_convert('Asia/Kolkata')
 
   df_latest_row = df[-1:-2:-1]
 
