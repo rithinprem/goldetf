@@ -15,7 +15,6 @@
             padding: 0
         }
 
-        /* ---------- VARIABLES ---------- */
         :root {
             --bg: #f5f7fa;
             --header: #ffffff;
@@ -23,11 +22,8 @@
             --subtle: #666;
             --border: #e0e0e0;
             --positive: #16a34a;
-            /* green  */
             --negative: #dc2626;
-            /* red    */
             --accent: #0052cc;
-            /* corporate blue */
             --radius: 8px;
             --shadow: 0 1px 3px rgba(0, 0, 0, .08);
         }
@@ -50,13 +46,12 @@
             color: var(--accent);
         }
 
-        /* ---------- CARD ---------- */
         .card {
             background: var(--header);
             border-radius: var(--radius);
             box-shadow: var(--shadow);
             width: 100%;
-            max-width: 1100px;
+            max-width: 1200px;
             overflow: hidden;
         }
 
@@ -68,9 +63,8 @@
             font-size: 1.05rem;
         }
 
-        /* ---------- TABLE ---------- */
         .table-wrapper {
-            overflow-x: auto
+            overflow-x: auto;
         }
 
         table {
@@ -95,7 +89,6 @@
             text-align: left
         }
 
-        /* Date column */
         tbody tr:hover {
             background: #fafbfc
         }
@@ -104,7 +97,6 @@
             font-variant-numeric: tabular-nums
         }
 
-        /* ---------- DELTA COLOURS ---------- */
         .delta.positive {
             color: var(--positive);
             font-weight: 600
@@ -115,7 +107,6 @@
             font-weight: 600
         }
 
-        /* ---------- BUTTON ---------- */
         .btn-wrapper {
             margin-top: 1.25rem;
             display: flex;
@@ -150,7 +141,6 @@
             font-size: 0.9rem
         }
 
-        /* ---------- PHONE ---------- */
         @media(max-width:600px) {
             body {
                 padding: 1rem .5rem
@@ -179,11 +169,17 @@
             <table id="dataTable">
                 <thead>
                     <tr>
-                        <th>Date-Time</th>
+                        <th>Yesterday</th>
                         <th>Prev Close</th>
-                        <th>Pre-Market Price</th>
-                        <th>Current Day</th>
-                        <th>Delta</th>
+                        <th>Market Price</th>
+                        <th>Today</th>
+                        <th>Market Δ</th>
+                        <th>Today's End</th>
+                        <th>Today's End Price</th>
+                        <th>Day Change</th>
+                        <th>Δ | GOLDIETF</th>
+                        <th>Δ | GOLDBEES</th>
+                        <th>Δ | HDFCGOLD</th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -197,8 +193,9 @@
     </div>
 
     <script>
-        const REFRESH_INTERVAL = 6000; // 60 seconds
-        const RETRY_INTERVAL = 5000;    // 5 seconds between retries if data invalid
+        const REFRESH_INTERVAL = 8000; // 1 min auto refresh
+        const RETRY_INTERVAL = 5000;
+        const maxRetries = 5;
 
         async function fetchData() {
             const btn = document.getElementById('refreshBtn');
@@ -207,76 +204,80 @@
             btn.textContent = 'Loading…';
             status.textContent = 'Fetching data…';
 
-            try {
-                let validData = false;
-                let rows = [];
-                let attempts = 0;
-                const maxRetries = 5;
+            let attempts = 0, validData = false, rows = [];
 
-                while (!validData && attempts < maxRetries) {
-                    attempts++;
-                    try {
-                        const res = await fetch('/data');
-                        rows = await res.json();
-
-                        // Check if we got valid rows
-                        if (rows && Array.isArray(rows) && rows.length > 0 && !rows[0].error) {
-                            validData = true;
-                        } else {
-                            status.textContent = `Data not ready. Retrying (${attempts}/${maxRetries})...`;
-                            await new Promise(r => setTimeout(r, RETRY_INTERVAL));
-                        }
-                    } catch (err) {
-                        console.error(err);
-                        status.textContent = `Fetch error. Retrying (${attempts}/${maxRetries})...`;
+            while (!validData && attempts < maxRetries) {
+                attempts++;
+                try {
+                    const res = await fetch('/data');
+                    rows = await res.json();
+                    if (rows && Array.isArray(rows) && rows.length > 0 && !rows[0].error) {
+                        validData = true;
+                    } else {
+                        status.textContent = `Data not ready. Retrying (${attempts}/${maxRetries})...`;
                         await new Promise(r => setTimeout(r, RETRY_INTERVAL));
                     }
+                } catch (err) {
+                    console.error(err);
+                    status.textContent = `Fetch error. Retrying (${attempts}/${maxRetries})...`;
+                    await new Promise(r => setTimeout(r, RETRY_INTERVAL));
                 }
+            }
 
-                if (!validData) {
-                    status.textContent = 'Failed to fetch valid data.';
-                    btn.disabled = false;
-                    btn.textContent = 'Refresh';
-                    return;
-                }
-
-                // Update table
-                const tbody = document.querySelector('#dataTable tbody');
-                tbody.innerHTML = '';
-                rows.forEach(r => {
-                    const tr = document.createElement('tr');
-                    const deltaVal = parseFloat(r.delta);
-                    const deltaClass = deltaVal >= 0 ? 'positive' : 'negative';
-
-                    tr.innerHTML = `
-        <td>${r.datetime || ''}</td>
-        <td class="num">${Number(r.prev_close || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
-        <td class="num">${Number(r['pre-market-price'] || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
-        <td>${r.current_day || ''}</td>
-        <td class="delta ${deltaClass}">${r.delta || ''}</td>`;
-                    tbody.appendChild(tr);
-                });
-
-                const now = new Date();
-                status.textContent = 'Last updated: ' + now.toLocaleTimeString();
-
-            } catch (err) {
-                console.error(err);
-                status.textContent = 'Unexpected error fetching data.';
-            } finally {
+            if (!validData) {
+                status.textContent = 'Failed to fetch valid data.';
                 btn.disabled = false;
                 btn.textContent = 'Refresh';
+                return;
             }
+
+            const tbody = document.querySelector('#dataTable tbody');
+            tbody.innerHTML = '';
+
+            rows.forEach(r => {
+                const tr = document.createElement('tr');
+
+                function fmt(v) {
+                    return (v !== null && v !== undefined && !isNaN(v))
+                        ? Number(v).toLocaleString('en-IN', { maximumFractionDigits: 2 })
+                        : v || '';
+                }
+
+                const deltas = ['market delta', 'Day change', 'delta|GOLDIETF', 'delta|GOLDBEES', 'delta|HDFCGOLD'];
+                const makeDeltaClass = (key) => {
+                    const val = parseFloat(r[key]);
+                    return isNaN(val) ? '' : (val >= 0 ? 'positive' : 'negative');
+                };
+
+                tr.innerHTML = `
+                    <td>${r['Yesterday'] || ''}</td>
+                    <td class="num">${fmt(r['prev_close'])}</td>
+                    <td class="num">${fmt(r['market-price'])}</td>
+                    <td>${r['Today'] || ''}</td>
+                    <td class="delta ${makeDeltaClass('market delta')}">${r['market delta'] || ''}</td>
+                    <td>${r["Today's end"] || ''}</td>
+                    <td class="num">${fmt(r["Today's_end_price"])}</td>
+                    <td class="delta ${makeDeltaClass('Day change')}">${r['Day change'] || ''}</td>
+                    <td class="delta ${makeDeltaClass('delta|GOLDIETF')}">${r['delta|GOLDIETF'] || ''}</td>
+                    <td class="delta ${makeDeltaClass('delta|GOLDBEES')}">${r['delta|GOLDBEES'] || ''}</td>
+                    <td class="delta ${makeDeltaClass('delta|HDFCGOLD')}">${r['delta|HDFCGOLD'] || ''}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            const now = new Date();
+            status.textContent = 'Last updated: ' + now.toLocaleTimeString();
+
+            btn.disabled = false;
+            btn.textContent = 'Refresh';
         }
 
-        // Initial load and auto-refresh
         window.addEventListener('DOMContentLoaded', () => {
             fetchData();
             setInterval(fetchData, REFRESH_INTERVAL);
             document.getElementById('refreshBtn').addEventListener('click', fetchData);
         });
     </script>
-
 
 </body>
 
