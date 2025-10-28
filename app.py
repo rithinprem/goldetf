@@ -37,7 +37,6 @@ def data():
     df = df.replace({pd.NA: None, pd.NaT: None, float('nan'): None})
     df = df.where(pd.notnull(df), None)  # another safeguard
 
-    print(df.to_dict(orient='records'))
     return jsonify(df.to_dict(orient='records'))
 
 if __name__ == '__main__':
