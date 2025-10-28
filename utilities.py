@@ -58,7 +58,7 @@ def etf(code):
   etf = code
   endTimeInMillis = int(time.time())*1000
   intervalInMinutes = '5'
-  startTimeInMillis = int(time.time())*1000 - 2334959000
+  startTimeInMillis = int(time.time())*1000 - 2338591000
 
 
   headers = {
@@ -73,23 +73,46 @@ def etf(code):
   url = f'https://groww.in/v1/api/charting_service/v2/chart/delayed/exchange/NSE/segment/CASH/{etf}?endTimeInMillis={endTimeInMillis}&intervalInMinutes={intervalInMinutes}&startTimeInMillis={startTimeInMillis}'
   response = requests.get(url,headers=headers)
   data = response.json()
-  df= pd.DataFrame(data['candles'],columns=['starttime','open','high','low','close','na'])
-  df.drop(['na'],axis=1,inplace=True)
-  df.starttime = pd.to_datetime(df.starttime,unit='s').dt.tz_localize('UTC').dt.tz_convert('Asia/Kolkata').dt.tz_localize(None)
-  df_ = df.copy()
-  df_latest_row = df_[-1:-2:-1].reset_index(drop=True)
-  df_9am = df_[df_['starttime'].dt.time == t(15, 25)][1:]
-  df_330pm = df_[df_['starttime'].dt.time == t(15, 25)][:-1]
-  df = df_330pm[['starttime','close']].reset_index(drop=True)
-  df['endtime'] = df_9am[['starttime']].reset_index(drop=True)
-  df['close_new'] = df_9am[['close']].reset_index(drop=True)
-  df = df.sort_values('endtime',ascending=False).reset_index(drop=True)
-  df.loc[0,["endtime",'close_new']] = [df_latest_row.iloc[0]['starttime'],df_latest_row.iloc[0]['close']]
+  df_old= pd.DataFrame(data['candles'],columns=['starttime','open','high','low','close','na'])
 
-  df[f'delta|{code}'] = round((df['close_new']-df['close'])/df['close']*100,2)
-  df[f'delta|{code}'] = df[f'delta|{code}'].astype(str)+'%'
-  df.rename(columns={'starttime':f'Yesterday|{code}','endtime':"Today's end",'close_new':f"Today's_end_price|{code}"},inplace=True)
-  df =df.reset_index(drop=True)
+  df_old = df_old.sort_values(by='starttime', ascending=True)
+  df_old = df_old.drop(['na'], axis=1)
+
+  df_old['starttime'] = pd.to_datetime(df_old['starttime'],unit='s')
+  df_old['starttime'] = df_old['starttime'].dt.tz_localize('UTC').dt.tz_convert('Asia/Kolkata').dt.tz_localize(None)
+
+  df_latest_row = df_old[-1:-2:-1]
+
+  #Filter rows where time is exactly 3:30 PM
+  df_ = df_old[df_old['starttime'].dt.time == t(15, 25)].reset_index(drop=True)
+
+  #Filter rows where time is exactly 9 AM
+  df_9am = df_old[df_old['starttime'].dt.time == t(9, 15)][1:].reset_index(drop=True)
+
+
+
+
+  df_['Today'] = df_9am['starttime']
+  df_["Today's end"] = df_old[df_old['starttime'].dt.time == t(15, 25)][1:].reset_index(drop=True)['starttime']
+  df_["Today's_end_price"] =df_old[df_old['starttime'].dt.time == t(15, 25)][1:].reset_index(drop=True)['close']
+
+  df_['market-price'] = df_9am['open']
+  df_ = df_.drop(labels=['high','low','open'],axis=1)
+  df_ = df_.rename(columns={'close':'prev_close'})
+  df = df_.sort_values('starttime',ascending=False)
+  df = df.reset_index(drop=True)
+
+  df.loc[0,['market-price','Today']] = [df_latest_row.iloc[0]['close'],df_latest_row.iloc[0]['starttime']]
+
+  df['market delta'] = round((df['market-price'] - df['prev_close'])/df['prev_close']*100,2)
+  df['market delta'] = df['market delta'].astype(str)+'%'
+  df['Day change'] = round((df["Today's_end_price"]-df['prev_close'])/df['prev_close']*100,2)
+  df['Day change'] = df['Day change'].astype(str)+'%'
+
+  df=df.rename(columns={'starttime':'Yesterday'})
+
+  df = df[["Yesterday","prev_close","market-price","Today","market delta","Today's end","Today's_end_price","Day change"]]
+  df.rename(columns={'Yesterday':f'Yesterday|{code}',"Today's_end_price":f"Today's_end_price|{code}","market delta":f"market delta|{code}","prev_close":f"prev_close|{code}",'market-price':f"market-price|{code}",'Today':f'Today|{code}','Day change':f'Day change|{code}'},inplace=True)
 
   return df
 
@@ -131,5 +154,5 @@ def rectify_holidays_change(data,code):
   df3["Today's end"] = pd.to_datetime(df3["Today's end"])
   df3['Today'] = pd.to_datetime(df3['Today'])
 
-  return df3.drop([f'Yesterday|{code}','close',f"Today's_end_price|{code}"],axis=1)
+  return df3.drop([f'Yesterday|{code}',f"Today's_end_price|{code}",f'Today|{code}',f"market-price|{code}",f"prev_close|{code}",],axis=1)
 

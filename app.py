@@ -33,10 +33,11 @@ def data():
     df_new = merge(df_new,df3,code2)
     df = merge(df_new,df4,code3)
 
-    #  Convert numpy types and NaN to JSON-safe types
     df = df.applymap(lambda x: x.item() if hasattr(x, 'item') else x)
     df = df.replace({pd.NA: None, pd.NaT: None, float('nan'): None})
+    df = df.where(pd.notnull(df), None)  # another safeguard
 
+    print(df.to_dict(orient='records'))
     return jsonify(df.to_dict(orient='records'))
 
 if __name__ == '__main__':
